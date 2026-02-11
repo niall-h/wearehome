@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "@neondatabase/auth/ui/tailwind";
 
 @plugin "tailwindcss-animate";
 @import "tw-animate-css";
@@ -57,7 +58,7 @@ body {
 .node {
   all: unset;
   cursor: pointer;
-  width: 110px;
+  width: fit-content;
   background-color: #fff;
   padding: 0.5rem;
   text-align: center;
@@ -139,6 +140,19 @@ body {
 
 /* VERTICAL (mobile) */
 @media (max-width: 767px) {
+  .node,
+  .center-node {
+    font-size: 12px;
+  }
+
+  .node {
+    max-width: 77px;
+  }
+
+  .center-node > * {
+    max-width: 50px;
+  }
+
   .kinetic {
     top: -1rem;
     left: 50%;

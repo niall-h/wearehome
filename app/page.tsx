@@ -80,7 +80,7 @@ export default function Home() {
 
       {/* Stage Cards */}
       <section
-        className="mx-auto w-full max-w-[1500px] grid gap-6 px-16 justify-center
+        className="mx-auto w-full max-w-[1500px] grid gap-6 justify-center
         [grid-template-columns:repeat(auto-fit,minmax(250px,300px))]"
       >
         {data.map((stage) => (

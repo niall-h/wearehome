@@ -9,29 +9,30 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Check, X, Pencil, Trash2 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
+import { Trash2, Pencil, X, Check } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Stage } from "@/lib/data/stages";
-import { Spinner } from "@/components/ui/spinner";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface StageCardProps {
   stage: Stage;
   loading: boolean;
-  onUpdate: (updatedLineup: string[]) => void; // callback to parent
+  onUpdate: (updatedLineup: string[]) => void;
 }
 
 export function StageCard({ stage, loading, onUpdate }: StageCardProps) {
-  const [adding, setAdding] = useState<boolean>(false);
-  const [newPrediction, setNewPrediction] = useState("");
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [draft, setDraft] = useState<string>("");
-  const inputRef = useRef<HTMLInputElement>(null);
-
   const predictions = stage.lineup ?? [];
 
-  // Simulate mock API call
+  const [adding, setAdding] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [newPrediction, setNewPrediction] = useState("");
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+
+  const inputRef = useRef<HTMLInputElement>(null);
+
   const simulateApiCall = async (updated: string[]) =>
-    new Promise<string[]>((resolve) => setTimeout(() => resolve(updated), 500));
+    new Promise<string[]>((resolve) => setTimeout(() => resolve(updated), 300));
 
   // ---------- ADD ----------
   const addPrediction = async () => {
@@ -43,51 +44,40 @@ export function StageCard({ stage, loading, onUpdate }: StageCardProps) {
     setAdding(false);
   };
 
-  const cancelAddPrediction = () => {
+  const cancelAdd = () => {
+    setAdding(false);
     setNewPrediction("");
-    setAdding(false);
   };
 
-  const handleAddClick = () => {
-    cancelEdit();
-    setAdding(true);
+  // ---------- EDIT MODE ----------
+  const enterEditMode = () => {
+    setEditMode(true);
+    setSelected(new Set());
   };
 
-  // ---------- EDIT ----------
-  const editPrediction = (index: number) => {
-    setAdding(false);
-    setEditingIndex(index);
-    setDraft(predictions[index]);
+  const cancelEditMode = () => {
+    setEditMode(false);
+    setSelected(new Set());
   };
 
-  const saveEdit = async () => {
-    if (editingIndex === null || !draft.trim()) return;
-    const updated = predictions.map((p, i) =>
-      i === editingIndex ? draft.trim() : p
-    );
+  // ---------- SELECTION ----------
+  const toggleSelect = (index: number) => {
+    const next = new Set(selected);
+    next.has(index) ? next.delete(index) : next.add(index);
+    setSelected(next);
+  };
+
+  const deleteSelected = async () => {
+    if (selected.size === 0) return;
+    const updated = predictions.filter((_, i) => !selected.has(i));
     const result = await simulateApiCall(updated);
     onUpdate(result);
-    setEditingIndex(null);
-    setDraft("");
-  };
-
-  const cancelEdit = () => {
-    setEditingIndex(null);
-    setDraft("");
-  };
-
-  // ---------- DELETE ----------
-  const deletePrediction = async (index: number) => {
-    const updated = predictions.filter((_, i) => i !== index);
-    const result = await simulateApiCall(updated);
-    onUpdate(result);
+    cancelEditMode();
   };
 
   useEffect(() => {
-    if ((adding || editingIndex !== null) && inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, [adding, editingIndex]);
+    if (adding && inputRef.current) inputRef.current.focus();
+  }, [adding]);
 
   return (
     <Card className="w-full h-[350px] max-w-[300px] flex flex-col">
@@ -95,62 +85,37 @@ export function StageCard({ stage, loading, onUpdate }: StageCardProps) {
         <CardTitle>{stage.name}</CardTitle>
       </CardHeader>
 
-      {/* CardContent with scroll and flex layout */}
       <CardContent className="flex-1 flex flex-col overflow-hidden">
         {loading ? (
           <div className="flex-1 flex items-center justify-center">
             <Spinner className="size-6" />
           </div>
-        ) : predictions.length > 0 ? (
+        ) : predictions.length ? (
           <div className="flex-1 flex flex-col overflow-y-auto gap-1">
-            {predictions.map((artist, index) => (
-              <div
-                key={index}
-                className={`group flex items-center py-1 justify-between rounded transition ${
-                  editingIndex === index ? "" : "px-2 hover:bg-gray-100"
-                }`}
-              >
-                {editingIndex === index ? (
-                  <div className="flex w-full gap-2 px-2">
-                    <Input
-                      ref={inputRef}
-                      value={draft}
-                      onChange={(e) => setDraft(e.target.value)}
+            {predictions.map((artist, index) => {
+              const isSelected = selected.has(index);
+
+              return (
+                <div
+                  key={index}
+                  onClick={() => editMode && toggleSelect(index)}
+                  className={`flex items-center justify-between rounded px-2 py-1 cursor-pointer transition
+  ${editMode && isSelected ? "bg-pink-100" : ""}
+  ${editMode ? "hover:bg-pink-50" : "hover:bg-gray-100"}`}
+                >
+                  <span className="text-sm truncate">{artist}</span>
+
+                  {editMode && (
+                    <Checkbox
+                      checked={isSelected}
+                      onCheckedChange={() => toggleSelect(index)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="data-[state=checked]:bg-[#ed3895] data-[state=checked]:border-[#ed3895]"
                     />
-                    <button
-                      className="text-gray-400 hover:text-green-500"
-                      onClick={saveEdit}
-                    >
-                      <Check className="h-4 w-4" />
-                    </button>
-                    <button
-                      className="text-gray-400 hover:text-red-500"
-                      onClick={cancelEdit}
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <span className="text-sm">{artist}</span>
-                    <div className="hidden group-hover:flex gap-2">
-                      <button
-                        className="text-gray-400 hover:text-gray-700"
-                        onClick={() => editPrediction(index)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button
-                        className="text-gray-400 hover:text-red-500"
-                        onClick={() => deletePrediction(index)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            ))}
+                  )}
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="flex-1 flex items-center justify-center">
@@ -159,33 +124,55 @@ export function StageCard({ stage, loading, onUpdate }: StageCardProps) {
         )}
       </CardContent>
 
-      {/* Footer Add section always at bottom */}
-      <CardFooter className="flex-shrink-0">
-        {!loading &&
-          (adding ? (
-            <div className="flex gap-2">
-              <Input
-                ref={inputRef}
-                placeholder="Artist Name"
-                value={newPrediction}
-                onChange={(e) => setNewPrediction(e.target.value)}
-              />
-              <button
-                className="text-gray-400 hover:text-green-500"
-                onClick={addPrediction}
-              >
-                <Check />
-              </button>
-              <button
-                className="text-gray-400 hover:text-red-500"
-                onClick={cancelAddPrediction}
-              >
-                <X />
-              </button>
-            </div>
-          ) : (
-            <Button onClick={handleAddClick}>Add</Button>
-          ))}
+      <CardFooter className="flex gap-2 w-full">
+        {adding ? (
+          <>
+            <Input
+              ref={inputRef}
+              placeholder="Artist name"
+              value={newPrediction}
+              onChange={(e) => setNewPrediction(e.target.value)}
+              className="flex-1"
+            />
+            <Button size="icon" variant="ghost" onClick={addPrediction}>
+              <Check />
+            </Button>
+            <Button size="icon" variant="ghost" onClick={cancelAdd}>
+              <X />
+            </Button>
+          </>
+        ) : editMode ? (
+          <>
+            <Button
+              variant="outline"
+              onClick={cancelEditMode}
+              className="w-1/2"
+            >
+              <X className="mr-1 h-4 w-4" /> Cancel
+            </Button>
+
+            <Button
+              onClick={deleteSelected}
+              disabled={selected.size === 0}
+              className="w-1/2 bg-red-600 text-white hover:bg-red-700"
+            >
+              <Trash2 className="mr-1 h-4 w-4" /> Delete
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button
+              onClick={() => setAdding(true)}
+              className="w-1/2 bg-[#ed3895] text-white hover:bg-[#d82f86]"
+            >
+              Add
+            </Button>
+
+            <Button variant="outline" onClick={enterEditMode} className="w-1/2">
+              <Pencil className="mr-1 h-4 w-4" /> Edit
+            </Button>
+          </>
+        )}
       </CardFooter>
     </Card>
   );
